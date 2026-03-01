@@ -451,7 +451,14 @@ function speak(text, onEnd) {
   utt.pitch = 1.25;
   utt.volume = 1;
   if (preferredVoice) utt.voice = preferredVoice;
-  if (onEnd) utt.onend = onEnd;
+  if (onEnd) {
+    let fired = false;
+    const once = () => { if (!fired) { fired = true; onEnd(); } };
+    utt.onend = once;
+    // iOS Safari sometimes never fires onend — timeout is the fallback
+    const words = text.trim().split(/\s+/).length;
+    setTimeout(once, Math.round(words * 600) + 1000);
+  }
   speechSynthesis.speak(utt);
 }
 
@@ -818,10 +825,15 @@ function resetAndReplay() {
    EVENT LISTENERS
 ───────────────────────────────────────────────────────────────────── */
 numButtons.forEach(btn => {
-  btn.addEventListener('click', () => {
+  const handler = () => {
     initAudio();
     handleAnswer(parseInt(btn.dataset.value, 10));
-  });
+  };
+  btn.addEventListener('click', handler);
+  btn.addEventListener('touchstart', e => {
+    e.preventDefault(); // prevents the ghost click that would fire handler twice
+    handler();
+  }, { passive: false });
 });
 
 // Emoji tap-to-count
